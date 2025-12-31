@@ -22,7 +22,25 @@
         "command": "velog-auto-writer.setApiKey",
         "title": "Velog: Gemini API 키 설정"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "velog-auto-writer",
+          "title": "Velog Auto Writer",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "velog-auto-writer": [
+        {
+          "type": "webview",
+          "id": "velog-auto-writer.webview",
+          "name": "블로그 글 생성"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

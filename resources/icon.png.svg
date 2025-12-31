@@ -1,0 +1,14 @@
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 배경 -->
+  <rect width="128" height="128" rx="16" fill="#20C997"/>
+  
+  <!-- 펜 아이콘 -->
+  <g transform="translate(32, 32)">
+    <path d="M48 8a8 8 0 1 1 11.31 11.31L24 54.62 8 64l9.38-16L48 8z" 
+          fill="white" stroke="white" stroke-width="2"/>
+    
+    <!-- V 모양 -->
+    <path d="M24 32l8 16 8-16" 
+          fill="none" stroke="#1E2A36" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
