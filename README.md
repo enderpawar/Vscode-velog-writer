@@ -200,8 +200,3 @@ node index.js preview -d 30
 
 MIT
 
-## 🙏 감사
-
-- Google Gemini API
-- Commander.js
-- Chalk & Ora
