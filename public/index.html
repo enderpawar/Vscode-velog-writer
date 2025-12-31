@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velog 블로그 자동 작성기</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✍️ Velog 블로그 자동 작성기</h1>
+            <p>Git 커밋 정보를 입력하면 자동으로 블로그 글을 생성해드려요!</p>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <div class="form-group">
+                    <label for="apiKey">
+                        <span class="label-text">🔑 Gemini API Key</span>
+                        <span class="label-hint">(필수)</span>
+                    </label>
+                    <input 
+                        type="password" 
+                        id="apiKey" 
+                        placeholder="Gemini API 키를 입력하세요"
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="commits">
+                        <span class="label-text">📝 Git 커밋 정보</span>
+                        <span class="label-hint">한 줄에 하나씩 입력하세요</span>
+                    </label>
+                    <textarea 
+                        id="commits" 
+                        rows="10"
+                        placeholder="예시:
+feat: 사용자 로그인 기능 추가
+fix: 버그 수정 - null pointer exception
+docs: README 업데이트
+refactor: 코드 리팩토링"
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="additionalInfo">
+                        <span class="label-text">💡 추가 정보</span>
+                        <span class="label-hint">(선택사항) 파일 변경 내역, 특이사항 등</span>
+                    </label>
+                    <textarea 
+                        id="additionalInfo" 
+                        rows="5"
+                        placeholder="예시:
+- React 컴포넌트 3개 추가
+- API 연동 완료
+- 테스트 코드 작성"
+                    ></textarea>
+                </div>
+
+                <button id="generateBtn" class="btn-primary">
+                    🚀 블로그 글 생성하기
+                </button>
+            </section>
+
+            <section class="output-section" id="outputSection" style="display: none;">
+                <div class="output-header">
+                    <h2>📄 생성된 블로그 글</h2>
+                    <button id="copyBtn" class="btn-secondary">📋 복사하기</button>
+                </div>
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>AI가 블로그 글을 작성하고 있어요... (30초 정도 걸려요)</p>
+                </div>
+                <div id="output" class="output-content"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>💡 Tip: API 키는 저장되지 않으며, 브라우저에서만 사용됩니다</p>
+        </footer>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+</body>
+</html>

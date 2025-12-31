@@ -1,0 +1,53 @@
+{
+  "name": "velog-auto-writer",
+  "displayName": "Velog Auto Writer",
+  "version": "1.0.0",
+  "description": "Git 커밋으로부터 Velog 블로그 글을 자동 생성하는 VSCode Extension",
+  "publisher": "velog-auto-writer",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "velog-auto-writer.generate",
+        "title": "Velog: 블로그 글 생성하기"
+      },
+      {
+        "command": "velog-auto-writer.setApiKey",
+        "title": "Velog: Gemini API 키 설정"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "keywords": [
+    "velog",
+    "blog",
+    "auto-writer",
+    "git",
+    "gemini",
+    "vscode-extension"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/vscode": "^1.107.0",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.27.2",
+    "typescript": "^5.9.3"
+  }
+}

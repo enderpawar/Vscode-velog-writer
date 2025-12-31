@@ -1,0 +1,10 @@
+node_modules/
+out/
+*.md
+!README.md
+.env
+.DS_Store
+*.log
+*.vsix
+.vscode-test/
+dist/
