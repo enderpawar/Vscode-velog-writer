@@ -4,6 +4,14 @@
   "version": "1.0.0",
   "description": "Git 커밋으로부터 Velog 블로그 글을 자동 생성하는 VSCode Extension",
   "publisher": "velog-auto-writer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enderpawar/Vscode-velog-writer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/enderpawar/Vscode-velog-writer/issues"
+  },
+  "homepage": "https://github.com/enderpawar/Vscode-velog-writer#readme",
   "engines": {
     "vscode": "^1.85.0"
   },

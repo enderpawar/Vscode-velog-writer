@@ -1,202 +1,162 @@
-# 🚀 Velog Auto Writer
+# ✍️ Velog Auto Writer
 
-Git 커밋으로부터 Velog 블로그 글을 자동으로 생성하는 CLI 도구입니다.
+> Git 커밋으로부터 Velog 스타일의 기술 블로그 글을 자동 생성하는 VSCode 확장 프로그램
 
-## ✨ 특징
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![VSCode Version](https://img.shields.io/badge/VSCode-1.85.0+-blue.svg)](https://code.visualstudio.com/)
 
-- 🔍 **Git 로그 자동 분석**: 최근 N일간의 커밋을 자동으로 파싱
-- 🤖 **Gemini AI 통합**: Google Gemini API로 자연스러운 블로그 글 생성
-- 📝 **Velog 스타일**: 친근한 말투 (~했어요)와 기술적 깊이의 균형
-- ⚡ **빠른 프로토타입**: CLI로 간단하게 사용
+## 📌 소개
 
-## 📦 설치
+개발하면서 쌓은 Git 커밋 내역을 바탕으로 자동으로 기술 블로그 글을 작성해주는 확장 프로그램입니다. Google Gemini AI를 활용하여 커밋 내역을 분석하고, Velog 스타일에 맞춰 자연스러운 블로그 포스트를 생성합니다.
 
-```bash
-cd velog-auto-writer
-npm install
-```
+### ✨ 주요 특징
 
-## 🔑 API 키 설정
+- 🔍 **스마트 커밋 분석**: 지정한 기간의 Git 커밋을 자동으로 수집하고 분석
+- 🤖 **AI 기반 글쓰기**: Google Gemini 2.0 Flash 모델로 자연스러운 블로그 글 생성
+- 📝 **Velog 최적화**: Velog 스타일에 맞춘 말투, 구조, 이모지 자동 적용
+- 🎨 **직관적인 UI**: VSCode 내장 웹뷰로 간편한 설정과 사용
+- ⚡ **원클릭 생성**: 클릭 한 번으로 완성된 블로그 글 획득
+- 📊 **커밋 통계**: 추가/삭제 라인 수, 작업 카테고리 자동 분석
 
-Gemini API 키가 필요합니다:
+## 🚀 빠른 시작
 
-```bash
-# 환경변수로 설정 (권장)
-export GEMINI_API_KEY=your_api_key_here
+### 1. 설치 및 설정
 
-# 또는 명령어 옵션으로 전달
-node index.js generate --api-key your_api_key_here
-```
-
-## 🎯 사용법
-
-### 1. 커밋 미리보기
-
-```bash
-# 오늘의 커밋 보기
-node index.js preview
-
-# 최근 7일 커밋 보기
-node index.js preview -d 7
-
-# 다른 저장소 분석
-node index.js preview --repo /path/to/repo
-```
+1. VSCode에서 확장 프로그램 설치 (또는 개발 중인 경우 F5로 디버깅)
+2. [Google AI Studio](https://makersuite.google.com/app/apikey)에서 Gemini API 키 발급
+3. VSCode 좌측 액티비티 바에서 Velog 아이콘 클릭
+4. 웹뷰 패널에서 API 키 입력 및 저장
 
 ### 2. 블로그 글 생성
 
-```bash
-# 오늘의 커밋으로 블로그 생성
-node index.js generate
+1. Git 프로젝트를 VSCode로 열기
+2. Velog Auto Writer 패널에서 분석 기간 설정 (1~365일)
+3. "블로그 글 생성하기" 버튼 클릭
+4. 생성된 Markdown 글을 새 탭에서 확인
+5. 내용 수정 후 Velog에 복사 붙여넣기
 
-# 최근 3일 커밋으로 생성
-node index.js generate -d 3
+### 명령어 팔레트 사용
 
-# 출력 경로 지정
-node index.js generate -o ./posts/2025-01-01-post.md
+- `Ctrl+Shift+P` (Mac: `Cmd+Shift+P`)를 누르고:
+  - **Velog: 블로그 글 생성하기** - 블로그 글 생성 시작
+  - **Velog: Gemini API 키 설정** - API 키 설정/변경
 
-# 전체 옵션 사용
-node index.js generate -d 7 -o ./my-blog.md --api-key YOUR_KEY --repo /path/to/repo
+## 📋 요구사항
+
+- **VSCode**: 1.85.0 이상
+- **Git**: 설치 및 프로젝트에 커밋 내역 존재
+- **Gemini API 키**: [Google AI Studio](https://makersuite.google.com/app/apikey)에서 무료 발급
+
+## 🎯 작동 원리
+
+### 1. Git 커밋 수집
+```
+git log --since=N.days.ago
+├─ 커밋 해시, 메시지, 작성자, 날짜 추출
+└─ 각 커밋별 추가/삭제 라인 수 계산
 ```
 
-## 📋 옵션
+### 2. 커밋 분석
+- 커밋 메시지 기반 카테고리 분류 (기능 개발, 버그 수정, 리팩토링 등)
+- 전체 작업량 통계 계산 (총 추가/삭제 라인)
+- 작업 기간 및 주요 변경사항 파악
 
-### `generate` 명령어
+### 3. AI 글 생성
+- Gemini 2.0 Flash 모델에 커밋 정보 전달
+- Velog 스타일 프롬프트로 자연스러운 블로그 글 작성
+- 제목, 서론, 본문, 결론 포함한 완성된 Markdown 반환
 
-| 옵션 | 설명 | 기본값 |
-|------|------|--------|
-| `-d, --days <number>` | 최근 N일간의 커밋 분석 | 1 |
-| `-o, --output <path>` | 출력 파일 경로 | ./blog-post.md |
-| `--api-key <key>` | Gemini API 키 | 환경변수 사용 |
-| `--repo <path>` | Git 저장소 경로 | 현재 디렉토리 |
+### 4. 결과 표시
+- VSCode 새 에디터 탭에 Markdown 파일로 열기
+- 바로 편집 가능한 형태로 제공
 
-### `preview` 명령어
+## 🛠️ 개발 및 빌드
 
-| 옵션 | 설명 | 기본값 |
-|------|------|--------|
-| `-d, --days <number>` | 최근 N일간의 커밋 | 1 |
-| `--repo <path>` | Git 저장소 경로 | 현재 디렉토리 |
-
-## 💡 예시
-
-### 1. 빠른 시작
-
-```bash
-# CREATIVE_AI 프로젝트의 오늘 작업 글쓰기
-cd /path/to/CREATIVE_AI
-export GEMINI_API_KEY=your_key
-node /path/to/velog-auto-writer/index.js generate
-```
-
-### 2. 주간 회고 작성
-
-```bash
-# 한 주간의 작업 정리
-node index.js generate -d 7 -o ./weekly-retrospective.md
-```
-
-### 3. 다른 프로젝트 분석
-
-```bash
-# 다른 저장소의 커밋으로 글 생성
-node index.js generate --repo ../other-project -d 3
-```
-
-## 📂 프로젝트 구조
+### 프로젝트 구조
 
 ```
 velog-auto-writer/
-├── index.js                 # CLI 진입점
-├── lib/
-│   ├── git-parser.js       # Git 로그 파싱
-│   ├── commit-analyzer.js  # 커밋 분석 & 카테고리 추론
-│   ├── blog-generator.js   # Gemini API 통합
-│   └── markdown-composer.js # Markdown 파일 생성
-├── package.json
-└── README.md
+├── src/
+│   ├── extension.ts          # 확장 프로그램 진입점
+│   ├── blog-generator.ts     # Gemini AI 블로그 생성
+│   ├── git-parser.ts          # Git 커밋 파싱
+│   └── webview-provider.ts    # 웹뷰 UI 제공
+├── public/                    # 웹뷰 HTML/CSS/JS
+├── lib/                       # 컴파일된 JS 파일
+└── package.json
 ```
 
-## 🛠 기술 스택
-
-- **Node.js**: ES Modules
-- **@google/generative-ai**: Gemini API
-- **commander**: CLI 프레임워크
-- **chalk**: 터미널 컬러 출력
-- **ora**: 로딩 스피너
-
-## 📝 생성되는 글의 구조
-
-1. **제목**: 이모지 포함, 흥미롭게
-2. **들어가며**: 오늘/이번에 무엇을 했는지
-3. **주요 작업 내용**:
-   - 무엇을 했는지
-   - 왜 했는지
-   - 어떻게 했는지 (코드 예시)
-4. **배운 점**: 기술적 인사이트
-5. **마무리**
-
-## ⚙️ 커스터마이징
-
-### 프롬프트 수정
-
-`lib/blog-generator.js`의 `buildPrompt()` 함수를 수정하면 글의 톤, 구조, 길이를 조정할 수 있습니다.
-
-```javascript
-// 예: 더 짧은 글 생성
-function buildPrompt(analysis) {
-  return `...
-  - 길이: 150-200줄 (간단하게)
-  ...`;
-}
-```
-
-### 카테고리 추가
-
-`lib/commit-analyzer.js`의 `patterns` 객체에 패턴 추가:
-
-```javascript
-const patterns = {
-  'CI/CD': /ci|cd|deploy|pipeline/i,
-  'DB 작업': /database|sql|migration/i,
-  // ...
-};
-```
-
-## 🚀 향후 계획
-
-- [ ] 대화형 모드 (질문하며 글 작성)
-- [ ] 코드 diff 분석 (실제 변경 내용 포함)
-- [ ] 템플릿 시스템 (프로젝트 타입별)
-- [ ] Velog API 직접 업로드
-- [ ] GitHub Actions 통합
-
-## 🐛 문제 해결
-
-### "Git 저장소가 아니에요"
+### 로컬 개발
 
 ```bash
-# Git 저장소로 초기화
-git init
+# 의존성 설치
+npm install
 
-# 또는 --repo 옵션으로 경로 지정
-node index.js generate --repo /path/to/git/repo
+# TypeScript 컴파일
+npm run compile
+
+# Watch 모드 (자동 컴파일)
+npm run watch
+
+# VSCode 디버깅
+F5 키 (Extension Development Host 실행)
 ```
 
-### "Gemini API 키가 필요해요"
+### 배포
 
 ```bash
-# API 키 발급: https://makersuite.google.com/app/apikey
-export GEMINI_API_KEY=your_key_here
+# 프로덕션 빌드
+npm run vscode:prepublish
+
+# VSIX 패키지 생성 (vsce 설치 필요)
+vsce package
 ```
 
-### "최근 N일간 커밋이 없어요"
+## ⚙️ 설정
 
-```bash
-# 더 긴 기간 설정
-node index.js preview -d 30
-```
+확장 프로그램은 다음 데이터를 VSCode의 globalState에 저장합니다:
 
-## 📄 라이선스
+- **geminiApiKey**: Gemini API 키 (안전하게 암호화 저장)
 
-MIT
+설정은 웹뷰 패널에서 직접 관리하거나, 명령어 팔레트에서 변경할 수 있습니다.
+
+## 🐛 알려진 이슈
+
+- Windows 환경에서 PowerShell 사용이 필요합니다
+- 매우 큰 커밋 내역(100개 이상)은 생성 시간이 오래 걸릴 수 있습니다
+- Gemini API 할당량 초과 시 오류가 발생할 수 있습니다
+
+## 🤝 기여하기
+
+프로젝트 개선에 기여하고 싶으신가요?
+
+1. 이 저장소를 Fork
+2. Feature 브랜치 생성 (`git checkout -b feature/AmazingFeature`)
+3. 변경사항 커밋 (`git commit -m 'Add some AmazingFeature'`)
+4. 브랜치에 Push (`git push origin feature/AmazingFeature`)
+5. Pull Request 생성
+
+이슈와 PR은 언제나 환영합니다!
+
+## 📝 라이선스
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+
+## 🔗 링크
+
+- **GitHub**: [https://github.com/enderpawar/Vscode-velog-writer](https://github.com/enderpawar/Vscode-velog-writer)
+- **Issues**: [https://github.com/enderpawar/Vscode-velog-writer/issues](https://github.com/enderpawar/Vscode-velog-writer/issues)
+- **Gemini API**: [https://makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+
+## 💡 팁
+
+- **최적의 기간**: 7~14일 정도의 커밋이 가장 좋은 결과를 만듭니다
+- **커밋 메시지**: 명확한 커밋 메시지가 더 좋은 블로그 글을 만듭니다
+- **후처리**: AI가 생성한 글을 검토하고 개인적인 인사이트를 추가하세요
+
+---
+
+**즐거운 블로그 작성 되세요! ✨**
+
+Made with ❤️ by developers, for developers
 
