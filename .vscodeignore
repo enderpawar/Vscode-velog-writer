@@ -2,7 +2,6 @@
 .vscode-test/**
 src/**
 out/test/**
-node_modules/**
 .gitignore
 .vscodeignore
 tsconfig.json
@@ -10,5 +9,6 @@ vite.config.js
 public/**
 lib/**
 index.js
-README.md
 *.vsix
+velog-blog-post.md
+.github/**
