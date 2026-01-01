@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GitCommit } from './git-parser';
 
-export async function generateBlogPost(commits: GitCommit[], apiKey: string): Promise<string> {
+export async function generateBlogPost(commits: GitCommit[], apiKey: string, customPrompt?: string): Promise<string> {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const prompt = buildPrompt(commits);
+    const prompt = customPrompt ? buildCustomPrompt(commits, customPrompt) : buildPrompt(commits);
 
     try {
         const result = await model.generateContent(prompt);
@@ -108,4 +108,25 @@ ${commitList}
 1. 반드시 위의 헤더 형식(# + > 인용구 + --- 구분선)으로 시작하세요
 2. 메타 설명이나 주석 없이 바로 블로그 글 내용만 작성하세요
 3. 커밋 내역을 바탕으로 실제 작업한 것처럼 자연스럽게 풀어쓰세요`;
+}
+
+function buildCustomPrompt(commits: GitCommit[], customPrompt: string): string {
+    const totalAdditions = commits.reduce((sum, c) => sum + c.additions, 0);
+    const totalDeletions = commits.reduce((sum, c) => sum + c.deletions, 0);
+
+    const commitList = commits
+        .map((c, i) => `${i + 1}. [${c.hash.slice(0, 7)}] ${c.message} (+${c.additions} -${c.deletions})`)
+        .join('\n');
+
+    return `${customPrompt}
+
+## 📊 커밋 분석 데이터
+
+**기본 정보**:
+- 커밋 수: ${commits.length}개
+- 추가: ${totalAdditions}줄, 삭제: ${totalDeletions}줄
+- 작업 기간: ${commits[commits.length - 1]?.date} ~ ${commits[0]?.date}
+
+**커밋 내역**:
+${commitList}`;
 }

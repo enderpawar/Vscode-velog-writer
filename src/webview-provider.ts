@@ -30,15 +30,22 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                     vscode.window.showInformationMessage('API 키가 저장되었습니다!');
                     break;
                     
+                case 'saveCustomPrompt':
+                    await this._context.globalState.update('customPrompt', data.value);
+                    vscode.window.showInformationMessage('커스텀 프롬프트가 저장되었습니다!');
+                    break;
+                    
                 case 'generate':
                     await this._generateBlogPost(data);
                     break;
                     
                 case 'getSettings':
                     const apiKey = this._context.globalState.get<string>('geminiApiKey', '');
+                    const customPrompt = this._context.globalState.get<string>('customPrompt', '');
                     webviewView.webview.postMessage({
                         type: 'settings',
-                        apiKey: apiKey ? '••••••••' : ''
+                        apiKey: apiKey ? '••••••••' : '',
+                        customPrompt: customPrompt
                     });
                     break;
             }
@@ -70,8 +77,11 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
+            // 커스텀 프롬프트 가져오기
+            const customPrompt = data.useCustomPrompt ? this._context.globalState.get<string>('customPrompt', '') : '';
+
             // 블로그 글 생성
-            const blogContent = await generateBlogPost(commits, apiKey);
+            const blogContent = await generateBlogPost(commits, apiKey, customPrompt || undefined);
 
             // 새 에디터에 결과 표시
             const doc = await vscode.workspace.openTextDocument({
@@ -158,6 +168,20 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             font-size: 13px;
         }
         
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: var(--vscode-editor-font-family);
+            resize: vertical;
+            min-height: 120px;
+        }
+        
         input:focus {
             outline: 1px solid var(--vscode-focusBorder);
         }
@@ -230,6 +254,32 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             margin: 20px 0;
             border-top: 1px solid var(--vscode-panel-border);
         }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+        }
+        
+        .checkbox-container input[type="checkbox"] {
+            margin-right: 8px;
+            width: auto;
+        }
+        
+        .checkbox-container label {
+            margin: 0;
+            cursor: pointer;
+        }
+        
+        .expandable {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .expandable.expanded {
+            max-height: 500px;
+        }
     </style>
 </head>
 <body>
@@ -246,10 +296,27 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
     <div class="divider"></div>
     
     <div class="section">
+        <h3>🎨 커스텀 프롬프트 (선택)</h3>
+        <div class="hint" style="margin-bottom: 12px;">
+            💡 AI에게 어떻게 글을 작성할지 직접 지시할 수 있어요. 비워두면 기본 프롬프트가 사용됩니다.
+        </div>
+        <textarea id="customPrompt" placeholder="예: 당신은 기술 블로그 작성 전문가입니다. 주니어 개발자가 이해하기 쉽게 작성해주세요..."></textarea>
+        <button onclick="saveCustomPrompt()" class="btn-secondary">프롬프트 저장</button>
+        <button onclick="resetCustomPrompt()" class="btn-secondary" style="margin-top: 4px;">기본값으로 리셋</button>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="section">
         <h3>📝 블로그 글 생성</h3>
         <label for="days">분석할 기간 (일)</label>
         <input type="number" id="days" value="7" min="1" max="365">
         <div class="hint">최근 N일간의 Git 커밋을 분석합니다.</div>
+        
+        <div class="checkbox-container">
+            <input type="checkbox" id="useCustomPrompt">
+            <label for="useCustomPrompt">커스텀 프롬프트 사용하기</label>
+        </div>
         
         <button onclick="generateBlog()" id="generateBtn">🚀 블로그 글 생성하기</button>
         <div id="status" class="status"></div>
@@ -260,9 +327,10 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
     <div class="hint">
         <strong>사용 방법:</strong><br>
         1. Gemini API 키를 설정하세요<br>
-        2. 분석할 기간을 선택하세요<br>
-        3. 생성 버튼을 클릭하세요<br>
-        4. AI가 자동으로 블로그 글을 작성합니다!
+        2. (선택) 커스텀 프롬프트를 작성하고 저장하세요<br>
+        3. 분석할 기간을 선택하세요<br>
+        4. 커스텀 프롬프트를 사용할지 선택하세요<br>
+        5. 생성 버튼을 클릭하세요!
     </div>
     
     <script>
@@ -277,6 +345,9 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                 case 'settings':
                     if (message.apiKey) {
                         document.getElementById('apiKey').placeholder = 'API 키가 설정되어 있습니다';
+                    }
+                    if (message.customPrompt) {
+                        document.getElementById('customPrompt').value = message.customPrompt;
                     }
                     break;
                     
@@ -313,11 +384,33 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             setTimeout(() => hideStatus(), 3000);
         }
         
+        function saveCustomPrompt() {
+            const customPrompt = document.getElementById('customPrompt').value.trim();
+            vscode.postMessage({
+                type: 'saveCustomPrompt',
+                value: customPrompt
+            });
+            showStatus('커스텀 프롬프트가 저장되었습니다!', 'success');
+            setTimeout(() => hideStatus(), 3000);
+        }
+        
+        function resetCustomPrompt() {
+            document.getElementById('customPrompt').value = '';
+            vscode.postMessage({
+                type: 'saveCustomPrompt',
+                value: ''
+            });
+            showStatus('기본 프롬프트로 리셋되었습니다!', 'success');
+            setTimeout(() => hideStatus(), 3000);
+        }
+        
         function generateBlog() {
             const days = parseInt(document.getElementById('days').value);
+            const useCustomPrompt = document.getElementById('useCustomPrompt').checked;
             vscode.postMessage({
                 type: 'generate',
-                days: days
+                days: days,
+                useCustomPrompt: useCustomPrompt
             });
         }
         
