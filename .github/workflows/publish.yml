@@ -1,0 +1,33 @@
+name: Publish Extension
+
+on:
+  push:
+    tags:
+      - 'v*'  # v로 시작하는 태그 (예: v1.0.0, v1.0.1)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Compile TypeScript
+      run: npm run compile
+      
+    - name: Install vsce
+      run: npm install -g @vscode/vsce
+      
+    - name: Publish to Marketplace
+      run: vsce publish -p ${{ secrets.VSCE_PAT }}
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
