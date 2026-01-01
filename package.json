@@ -1,9 +1,9 @@
 {
   "name": "velog-auto-writer",
   "displayName": "Velog Auto Writer",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "Git 커밋으로부터 Velog 블로그 글을 자동 생성하는 VSCode Extension",
-  "publisher": "snowmile",
+  "publisher": "velog-auto-writer",
   "repository": {
     "type": "git",
     "url": "https://github.com/enderpawar/Vscode-velog-writer.git"
@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/enderpawar/Vscode-velog-writer#readme",
   "engines": {
-    "vscode": "^1.107.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"

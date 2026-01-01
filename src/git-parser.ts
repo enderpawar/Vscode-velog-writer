@@ -16,53 +16,77 @@ export async function getGitCommits(repoPath: string, days: number = 7): Promise
     try {
         const since = `${days}.days.ago`;
         
+        // numstat을 사용하여 한 번에 모든 정보 가져오기 (훨씬 빠름!)
         const { stdout } = await execAsync(
-            `git log "--pretty=format:%H|%s|%an|%ad" --date=short --since=${since}`,
-            { cwd: repoPath, shell: 'powershell.exe' }
+            `git log "--pretty=format:%H|%s|%an|%ad" --date=short --numstat --since=${since}`,
+            { cwd: repoPath, shell: 'powershell.exe', timeout: 10000 }
         );
 
         if (!stdout.trim()) {
             return [];
         }
 
-        const lines = stdout.trim().split('\n');
         const commits: GitCommit[] = [];
+        const lines = stdout.trim().split('\n');
+        
+        let currentCommit: Partial<GitCommit> | null = null;
 
         for (const line of lines) {
-            const [hash, message, author, date] = line.split('|');
-            
-            // 커밋별 통계 가져오기
-            try {
-                const { stdout: statOutput } = await execAsync(
-                    `git show --stat "--format=" ${hash}`,
-                    { cwd: repoPath, shell: 'powershell.exe' }
-                );
+            if (!line.trim()) continue;
 
-                const additions = (statOutput.match(/(\d+) insertion/)?.[1]) || '0';
-                const deletions = (statOutput.match(/(\d+) deletion/)?.[1]) || '0';
+            // 커밋 헤더 라인 (|를 포함)
+            if (line.includes('|')) {
+                // 이전 커밋이 있으면 저장
+                if (currentCommit && currentCommit.hash) {
+                    commits.push({
+                        hash: currentCommit.hash,
+                        message: currentCommit.message || '',
+                        author: currentCommit.author || '',
+                        date: currentCommit.date || '',
+                        additions: currentCommit.additions || 0,
+                        deletions: currentCommit.deletions || 0
+                    });
+                }
 
-                commits.push({
-                    hash,
-                    message: message.trim(),
-                    author: author.trim(),
-                    date: date.trim(),
-                    additions: parseInt(additions),
-                    deletions: parseInt(deletions)
-                });
-            } catch {
-                commits.push({
-                    hash,
+                // 새 커밋 시작
+                const [hash, message, author, date] = line.split('|');
+                currentCommit = {
+                    hash: hash.trim(),
                     message: message.trim(),
                     author: author.trim(),
                     date: date.trim(),
                     additions: 0,
                     deletions: 0
-                });
+                };
+            } else if (currentCommit) {
+                // numstat 라인 (additions deletions filename)
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    const add = parseInt(parts[0]) || 0;
+                    const del = parseInt(parts[1]) || 0;
+                    currentCommit.additions = (currentCommit.additions || 0) + add;
+                    currentCommit.deletions = (currentCommit.deletions || 0) + del;
+                }
             }
         }
 
+        // 마지막 커밋 저장
+        if (currentCommit && currentCommit.hash) {
+            commits.push({
+                hash: currentCommit.hash,
+                message: currentCommit.message || '',
+                author: currentCommit.author || '',
+                date: currentCommit.date || '',
+                additions: currentCommit.additions || 0,
+                deletions: currentCommit.deletions || 0
+            });
+        }
+
         return commits;
-    } catch (error) {
-        throw new Error(`Git 커밋을 가져오는데 실패했습니다: ${error}`);
+    } catch (error: any) {
+        if (error.killed) {
+            throw new Error('Git 명령 실행 시간이 초과되었습니다. 커밋이 너무 많거나 저장소가 큽니다.');
+        }
+        throw new Error(`Git 커밋을 가져오는데 실패했습니다: ${error.message || error}`);
     }
 }

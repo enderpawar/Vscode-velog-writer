@@ -1,5 +1,4 @@
 name: Publish Extension
-
 on:
   push:
     tags:
