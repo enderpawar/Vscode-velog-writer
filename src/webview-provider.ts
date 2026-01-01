@@ -20,7 +20,10 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this._extensionUri]
         };
 
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        const html = this._getHtmlForWebview(webviewView.webview);
+        console.log('HTML length:', html.length);
+        console.log('Has custom prompt section:', html.includes('커스텀 프롬프트'));
+        webviewView.webview.html = html;
 
         // 메시지 수신 처리
         webviewView.webview.onDidReceiveMessage(async data => {
