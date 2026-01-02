@@ -1,8 +1,13 @@
 name: Publish Extension
+
 on:
   push:
-    tags:
-      - 'v*'  # v로 시작하는 태그 (예: v1.0.0, v1.0.1)
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:  # 수동 실행도 가능
 
 jobs:
   publish:
@@ -10,12 +15,12 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         
     - name: Install dependencies
       run: npm ci
@@ -23,10 +28,46 @@ jobs:
     - name: Compile TypeScript
       run: npm run compile
       
-    - name: Install vsce
-      run: npm install -g @vscode/vsce
+    - name: Get current version
+      id: version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
       
-    - name: Publish to Marketplace
-      run: vsce publish -p ${{ secrets.VSCE_PAT }}
+    - name: Check if version already published
+      id: check
+      run: |
+        if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "⚠️ Version v${{ steps.version.outputs.version }} already published"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "✅ New version v${{ steps.version.outputs.version }} detected"
+        fi
+        
+    - name: Publish to VS Code Marketplace
+      if: steps.check.outputs.exists == 'false'
+      run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }} --allow-missing-repository
+      
+    - name: Create Git tag
+      if: steps.check.outputs.exists == 'false'
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git tag v${{ steps.version.outputs.version }}
+        git push origin v${{ steps.version.outputs.version }}
+        
+    - name: Package VSIX
+      if: steps.check.outputs.exists == 'false'
+      run: npx @vscode/vsce package --allow-missing-repository
+      
+    - name: Create GitHub Release
+      if: steps.check.outputs.exists == 'false'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        name: Release v${{ steps.version.outputs.version }}
+        body_path: CHANGELOG.md
+        files: '*.vsix'
+        generate_release_notes: true
       env:
-        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

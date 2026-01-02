@@ -2,15 +2,20 @@ import * as vscode from 'vscode';
 import { generateBlogPost } from './blog-generator';
 import { getGitCommits } from './git-parser';
 import { VelogWebviewProvider } from './webview-provider';
+import { fetchVelogPost, analyzePostStyle, styleToPrompt } from './velog-fetcher';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Velog Auto Writer extension is now active!');
 
     // Webview Provider 등록
-    const provider = new VelogWebviewProvider(context.extensionUri, context);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(VelogWebviewProvider.viewType, provider)
-    );
+    try {
+        const provider = new VelogWebviewProvider(context.extensionUri, context);
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider(VelogWebviewProvider.viewType, provider)
+        );
+    } catch (error) {
+        console.log('Webview provider already registered, skipping...');
+    }
 
     // 블로그 글 생성 명령어
     const generateCommand = vscode.commands.registerCommand('velog-auto-writer.generate', async () => {
