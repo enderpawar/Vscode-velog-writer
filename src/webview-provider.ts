@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { generateBlogPost } from './blog-generator';
 import { getGitCommits } from './git-parser';
+import { fetchVelogPost, analyzePostStyle, styleToPrompt } from './velog-fetcher';
 
 export class VelogWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'velog-auto-writer.webview';
@@ -38,8 +39,13 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                     vscode.window.showInformationMessage('커스텀 프롬프트가 저장되었습니다!');
                     break;
                     
-                case 'generate':
-                    await this._generateBlogPost(data);
+                case 'saveExampleUrls':
+                    await this._context.globalState.update('exampleUrls', data.value);
+                    vscode.window.showInformationMessage('예시 글 URL이 저장되었습니다!');
+                    break;
+                    
+                case 'analyzeStyle':
+                    await this._analyzeExamplePosts(data.urls);
                     break;
                     
                 case 'getSettings':
@@ -82,9 +88,15 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
 
             // 커스텀 프롬프트 가져오기
             const customPrompt = data.useCustomPrompt ? this._context.globalState.get<string>('customPrompt', '') : '';
+            
+            // 예시 글 스타일 프롬프트 가져오기
+            let stylePrompt = '';
+            if (data.useExampleStyle) {
+                stylePrompt = this._context.globalState.get<string>('analyzedStylePrompt', '');
+            }
 
             // 블로그 글 생성
-            const blogContent = await generateBlogPost(commits, apiKey, customPrompt || undefined);
+            const blogContent = await generateBlogPost(commits, apiKey, customPrompt || undefined, stylePrompt || undefined);
 
             // 새 에디터에 결과 표시
             const doc = await vscode.workspace.openTextDocument({
@@ -108,6 +120,75 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                 message: `오류: ${error}`
             });
             vscode.window.showErrorMessage(`오류 발생: ${error}`);
+        }
+    }
+
+    private async _analyzeExamplePosts(urls: string[]) {
+        try {
+            if (!urls || urls.length === 0) {
+                vscode.window.showWarningMessage('분석할 글 URL을 입력해주세요.');
+                return;
+            }
+
+            this._view?.webview.postMessage({ type: 'analysisStarted' });
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "예시 글 분석 중...",
+                cancellable: false
+            }, async (progress) => {
+                // 각 URL에서 글 가져오기
+                progress.report({ increment: 0, message: `${urls.length}개 글 가져오는 중...` });
+                
+                const posts = [];
+                for (let i = 0; i < urls.length; i++) {
+                    try {
+                        const post = await fetchVelogPost(urls[i]);
+                        posts.push(post);
+                        progress.report({ 
+                            increment: (30 / urls.length), 
+                            message: `${i + 1}/${urls.length} 글 분석 완료` 
+                        });
+                    } catch (error) {
+                        vscode.window.showWarningMessage(`URL ${i + 1} 처리 실패: ${error}`);
+                    }
+                }
+
+                if (posts.length === 0) {
+                    throw new Error('가져온 글이 없습니다. URL을 확인해주세요.');
+                }
+
+                // 스타일 분석
+                progress.report({ increment: 50, message: "스타일 패턴 분석 중..." });
+                const style = analyzePostStyle(posts);
+                const stylePrompt = styleToPrompt(style, posts);
+
+                // 분석 결과 저장
+                await this._context.globalState.update('analyzedStylePrompt', stylePrompt);
+                await this._context.globalState.update('analyzedStyle', JSON.stringify(style));
+
+                progress.report({ increment: 100, message: "완료!" });
+
+                this._view?.webview.postMessage({ 
+                    type: 'analysisComplete',
+                    success: true,
+                    style: style
+                });
+
+                vscode.window.showInformationMessage(
+                    `✨ ${posts.length}개 글 분석 완료!\n` +
+                    `톤: ${style.toneAnalysis}\n` +
+                    `이모지 사용: ${style.hasEmoji ? '많음' : '적음'}`
+                );
+            });
+
+        } catch (error) {
+            this._view?.webview.postMessage({ 
+                type: 'analysisComplete',
+                success: false,
+                message: `${error}`
+            });
+            vscode.window.showErrorMessage(`분석 실패: ${error}`);
         }
     }
 
@@ -311,6 +392,21 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
     <div class="divider"></div>
     
     <div class="section">
+        <h3>� 예시 글 스타일 학습 (선택)</h3>
+        <div class="hint" style="margin-bottom: 12px;">
+            💡 기존에 작성한 글의 URL을 입력하면, 글의 스타일과 톤을 분석하여 비슷하게 작성합니다.<br>
+            여러 개의 URL을 줄바꿈으로 구분하여 입력하세요.
+        </div>
+        <textarea id="exampleUrls" placeholder="https://velog.io/@username/post-title-1&#10;https://velog.io/@username/post-title-2" style="min-height: 100px;"></textarea>
+        <button onclick="saveExampleUrls()" class="btn-secondary">URL 저장</button>
+        <button onclick="analyzeStyle()" class="btn-secondary" style="margin-top: 4px;">📊 스타일 분석하기</button>
+        <div id="analysisStatus" class="status"></div>
+        <div id="analysisResult" class="hint" style="margin-top: 12px; display: none;"></div>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="section">
         <h3>📝 블로그 글 생성</h3>
         <label for="days">분석할 기간 (일)</label>
         <input type="number" id="days" value="7" min="1" max="365">
@@ -319,6 +415,11 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
         <div class="checkbox-container">
             <input type="checkbox" id="useCustomPrompt">
             <label for="useCustomPrompt">커스텀 프롬프트 사용하기</label>
+        </div>
+        
+        <div class="checkbox-container">
+            <input type="checkbox" id="useExampleStyle">
+            <label for="useExampleStyle">예시 글 스타일 적용하기</label>
         </div>
         
         <button onclick="generateBlog()" id="generateBtn">🚀 블로그 글 생성하기</button>
@@ -331,9 +432,9 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
         <strong>사용 방법:</strong><br>
         1. Gemini API 키를 설정하세요<br>
         2. (선택) 커스텀 프롬프트를 작성하고 저장하세요<br>
-        3. 분석할 기간을 선택하세요<br>
-        4. 커스텀 프롬프트를 사용할지 선택하세요<br>
-        5. 생성 버튼을 클릭하세요!
+        3. (선택) 예시 글 URL을 입력하고 스타일을 분석하세요<br>
+        4. 분석할 기간을 선택하세요<br>
+        5. 옵션을 선택하고 생성 버튼을 클릭하세요!
     </div>
     
     <script>
@@ -352,6 +453,9 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                     if (message.customPrompt) {
                         document.getElementById('customPrompt').value = message.customPrompt;
                     }
+                    if (message.exampleUrls) {
+                        document.getElementById('exampleUrls').value = message.exampleUrls;
+                    }
                     break;
                     
                 case 'generationStarted':
@@ -367,6 +471,30 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                         showStatus(message.message, 'error');
                     }
                     setTimeout(() => hideStatus(), 5000);
+                    break;
+                    
+                case 'analysisStarted':
+                    showAnalysisStatus('예시 글을 분석하고 있어요...', 'loading');
+                    break;
+                    
+                case 'analysisComplete':
+                    if (message.success) {
+                        showAnalysisStatus('스타일 분석 완료!', 'success');
+                        const result = document.getElementById('analysisResult');
+                        const emojiIcon = message.style.hasEmoji ? '✨' : '📄';
+                        const emojiText = message.style.hasEmoji ? '많이 사용' : '거의 사용 안 함';
+                        result.innerHTML = \`
+                            <strong>분석 결과:</strong><br>
+                            📝 톤: \${message.style.toneAnalysis}<br>
+                            \${emojiIcon} 이모지: \${emojiText}<br>
+                            📊 평균 섹션 길이: \${message.style.averageSectionLength}자<br>
+                            💻 평균 코드 블록: \${message.style.codeBlockCount}개
+                        \`;
+                        result.style.display = 'block';
+                    } else {
+                        showAnalysisStatus(message.message, 'error');
+                    }
+                    setTimeout(() => hideAnalysisStatus(), 5000);
                     break;
             }
         });
@@ -385,13 +513,57 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             document.getElementById('apiKey').placeholder = 'API 키가 설정되어 있습니다';
             showStatus('API 키가 저장되었습니다!', 'success');
             setTimeout(() => hideStatus(), 3000);
+        }saveExampleUrls() {
+            const urls = document.getElementById('exampleUrls').value.trim();
+            vscode.postMessage({
+                type: 'saveExampleUrls',
+                value: urls
+            });
+            showAnalysisStatus('URL이 저장되었습니다!', 'success');
+            setTimeout(() => hideAnalysisStatus(), 3000);
         }
         
-        function saveCustomPrompt() {
-            const customPrompt = document.getElementById('customPrompt').value.trim();
+        function analyzeStyle() {
+            const urlsText = document.getElementById('exampleUrls').value.trim();
+            if (!urlsText) {
+                showAnalysisStatus('URL을 입력해주세요', 'error');
+                setTimeout(() => hideAnalysisStatus(), 3000);
+                return;
+            }
+            
+            const urls = urlsText.split('\\n').map(u => u.trim()).filter(u => u.length > 0);
+         
+        
+        function showAnalysisStatus(message, type) {
+            const status = document.getElementById('analysisStatus');
+            status.textContent = message;
+            status.className = 'status show ' + type;
+        }
+        
+        function hideAnalysisStatus() {
+            const status = document.getElementById('analysisStatus');
+            status.className = 'status';
+        }   if (urls.length === 0) {
+                showAnalysisStatus('올바른 URL을 입력해주세요', 'error');
+                setTimeout(() => hideAnalysisStatus(), 3000);
+                return;
+            }
+            
             vscode.postMessage({
-                type: 'saveCustomPrompt',
-                value: customPrompt
+                type: 'analyzeStyle',
+                urls: urls
+            });
+        }
+        
+        function generateBlog() {
+            const days = parseInt(document.getElementById('days').value);
+            const useCustomPrompt = document.getElementById('useCustomPrompt').checked;
+            const useExampleStyle = document.getElementById('useExampleStyle').checked;
+            vscode.postMessage({
+                type: 'generate',
+                days: days,
+                useCustomPrompt: useCustomPrompt,
+                useExampleStyle: useExampleStyle
             });
             showStatus('커스텀 프롬프트가 저장되었습니다!', 'success');
             setTimeout(() => hideStatus(), 3000);

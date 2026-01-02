@@ -1,11 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GitCommit } from './git-parser';
 
-export async function generateBlogPost(commits: GitCommit[], apiKey: string, customPrompt?: string): Promise<string> {
+export async function generateBlogPost(commits: GitCommit[], apiKey: string, customPrompt?: string, stylePrompt?: string): Promise<string> {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const prompt = customPrompt ? buildCustomPrompt(commits, customPrompt) : buildPrompt(commits);
+    let prompt = customPrompt ? buildCustomPrompt(commits, customPrompt) : buildPrompt(commits);
+    
+    // 예시 글 스타일이 있으면 추가
+    if (stylePrompt) {
+        prompt = prompt + '\n\n' + stylePrompt;
+    }
 
     try {
         const result = await model.generateContent(prompt);

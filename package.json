@@ -67,7 +67,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0"
+    "@google/generative-ai": "^0.21.0",
+    "axios": "^1.13.2"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

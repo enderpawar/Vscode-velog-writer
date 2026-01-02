@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { generateBlogPost } from './blog-generator';
 import { getGitCommits } from './git-parser';
 import { VelogWebviewProvider } from './webview-provider';
+import { fetchVelogPost, analyzePostStyle, styleToPrompt } from './velog-fetcher';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Velog Auto Writer extension is now active!');
