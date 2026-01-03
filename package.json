@@ -29,6 +29,10 @@
       {
         "command": "velog-auto-writer.setApiKey",
         "title": "Velog: Gemini API 키 설정"
+      },
+      {
+        "command": "velog-auto-writer.viewStats",
+        "title": "Velog: 커밋 통계 보기"
       }
     ],
     "viewsContainers": {

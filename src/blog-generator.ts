@@ -1,15 +1,34 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GitCommit } from './git-parser';
+import { GitCommit, analyzeCommitStats, formatCommitStats } from './git-parser';
 
-export async function generateBlogPost(commits: GitCommit[], apiKey: string, customPrompt?: string, stylePrompt?: string): Promise<string> {
+export type BlogTemplate = 'default' | 'tutorial' | 'devlog' | 'troubleshooting' | 'retrospective';
+
+export async function generateBlogPost(
+    commits: GitCommit[], 
+    apiKey: string, 
+    customPrompt?: string, 
+    stylePrompt?: string,
+    template?: BlogTemplate,
+    includeStats?: boolean
+): Promise<string> {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    let prompt = customPrompt ? buildCustomPrompt(commits, customPrompt) : buildPrompt(commits);
+    // 템플릿 적용
+    let prompt = customPrompt 
+        ? buildCustomPrompt(commits, customPrompt) 
+        : buildPromptWithTemplate(commits, template || 'default');
     
     // 예시 글 스타일이 있으면 추가
     if (stylePrompt) {
         prompt = prompt + '\n\n' + stylePrompt;
+    }
+    
+    // 통계 정보 추가
+    if (includeStats) {
+        const stats = analyzeCommitStats(commits);
+        const statsText = formatCommitStats(stats);
+        prompt = prompt + '\n\n## 추가로 다음 통계 정보도 포함해주세요:\n' + statsText;
     }
 
     try {
@@ -135,3 +154,122 @@ function buildCustomPrompt(commits: GitCommit[], customPrompt: string): string {
 **커밋 내역**:
 ${commitList}`;
 }
+
+function buildPromptWithTemplate(commits: GitCommit[], template: BlogTemplate): string {
+    const baseInfo = getBaseCommitInfo(commits);
+    
+    switch (template) {
+        case 'tutorial':
+            return buildTutorialPrompt(commits, baseInfo);
+        case 'devlog':
+            return buildDevlogPrompt(commits, baseInfo);
+        case 'troubleshooting':
+            return buildTroubleshootingPrompt(commits, baseInfo);
+        case 'retrospective':
+            return buildRetrospectivePrompt(commits, baseInfo);
+        default:
+            return buildPrompt(commits);
+    }
+}
+
+function getBaseCommitInfo(commits: GitCommit[]) {
+    const totalAdditions = commits.reduce((sum, c) => sum + c.additions, 0);
+    const totalDeletions = commits.reduce((sum, c) => sum + c.deletions, 0);
+    const commitList = commits
+        .map((c, i) => `${i + 1}. [${c.hash.slice(0, 7)}] ${c.message} (+${c.additions} -${c.deletions})`)
+        .join('\n');
+    
+    const categories = new Set<string>();
+    commits.forEach(commit => {
+        const msg = commit.message.toLowerCase();
+        if (msg.includes('feat')) categories.add('기능 개발');
+        if (msg.includes('fix')) categories.add('버그 수정');
+        if (msg.includes('docs')) categories.add('문서화');
+        if (msg.includes('refactor')) categories.add('리팩토링');
+    });
+    
+    return { totalAdditions, totalDeletions, commitList, categories, commits };
+}
+
+function buildTutorialPrompt(commits: GitCommit[], info: any): string {
+    return `당신은 기술 블로그 튜토리얼 작성 전문가입니다. 아래 Git 커밋 내역을 바탕으로 **초보자도 따라할 수 있는 단계별 튜토리얼**을 작성해주세요.
+
+## 📊 커밋 분석
+- 커밋 수: ${info.commits.length}개
+- 추가: ${info.totalAdditions}줄, 삭제: ${info.totalDeletions}줄
+- 작업 카테고리: ${Array.from(info.categories).join(', ') || '일반 개발'}
+
+**커밋 내역**:
+${info.commitList}
+
+## 작성 가이드
+1. **# 🎓 [주제]: [부제목]** 형식의 제목
+2. **준비물/사전 지식** 섹션 필수
+3. **단계별 설명**: Step 1, Step 2... 형식으로 명확하게
+4. **코드 예제**: 각 단계마다 실제 작동하는 코드 포함
+5. **주의사항/팁**: 초보자가 실수할 수 있는 부분 강조
+6. **다음 단계**: 더 배울 수 있는 내용 제시`;
+}
+
+function buildDevlogPrompt(commits: GitCommit[], info: any): string {
+    return `당신은 개발 일지 작성 전문가입니다. 아래 Git 커밋 내역을 바탕으로 **일기처럼 자연스러운 개발 로그**를 작성해주세요.
+
+## 📊 커밋 분석
+- 커밋 수: ${info.commits.length}개
+- 추가: ${info.totalAdditions}줄, 삭제: ${info.totalDeletions}줄
+- 작업 기간: ${info.commits[info.commits.length - 1]?.date} ~ ${info.commits[0]?.date}
+
+**커밋 내역**:
+${info.commitList}
+
+## 작성 가이드
+1. **# 📝 [날짜] 개발일지: [오늘 한 일]** 형식의 제목
+2. **오늘의 목표**: 하루 시작할 때 세운 목표
+3. **작업 내용**: 시간순으로 무엇을 했는지
+4. **트러블슈팅**: 겪은 문제와 해결 과정
+5. **배운 점**: 오늘 새로 알게 된 것
+6. **내일 할 일**: 다음 작업 계획
+7. 편안하고 솔직한 어투 (반말 OK)`;
+}
+
+function buildTroubleshootingPrompt(commits: GitCommit[], info: any): string {
+    return `당신은 기술 문제 해결 전문가입니다. 아래 Git 커밋 내역을 바탕으로 **문제 해결 과정을 상세히 설명하는 글**을 작성해주세요.
+
+## 📊 커밋 분석
+- 커밋 수: ${info.commits.length}개
+- 추가: ${info.totalAdditions}줄, 삭제: ${info.totalDeletions}줄
+
+**커밋 내역**:
+${info.commitList}
+
+## 작성 가이드
+1. **# 🐛 [문제]: [간단한 설명]** 형식의 제목
+2. **## 문제 상황**: 어떤 문제가 발생했는지
+3. **## 증상**: 에러 메시지, 이상 동작 등
+4. **## 원인 분석**: 문제의 근본 원인 파악 과정
+5. **## 해결 방법**: 단계별 해결 과정 (코드 포함)
+6. **## 예방책**: 같은 문제가 재발하지 않도록
+7. **## 참고 자료**: 도움이 된 문서나 링크`;
+}
+
+function buildRetrospectivePrompt(commits: GitCommit[], info: any): string {
+    return `당신은 프로젝트 회고 전문가입니다. 아래 Git 커밋 내역을 바탕으로 **진솔한 프로젝트 회고록**을 작성해주세요.
+
+## 📊 커밋 분석
+- 커밋 수: ${info.commits.length}개
+- 추가: ${info.totalAdditions}줄, 삭제: ${info.totalDeletions}줄
+- 작업 기간: ${info.commits[info.commits.length - 1]?.date} ~ ${info.commits[0]?.date}
+
+**커밋 내역**:
+${info.commitList}
+
+## 작성 가이드
+1. **# 🔍 [프로젝트명] 회고: [핵심 주제]** 형식의 제목
+2. **## 프로젝트 개요**: 무엇을 만들었는지
+3. **## 잘한 점 (Keep)**: 계속 유지하고 싶은 것
+4. **## 아쉬운 점 (Problem)**: 개선이 필요한 부분
+5. **## 배운 점 (Insight)**: 프로젝트를 통해 얻은 인사이트
+6. **## 다음에 시도할 것 (Try)**: 앞으로 적용할 방법
+7. 솔직하고 개인적인 감정 표현 포함`;
+}
+
