@@ -27,12 +27,24 @@ export interface GitCommitOptions {
     pathFilter?: string; // 특정 경로만 필터링 (예: "src/", "*.ts")
     author?: string; // 특정 작성자만 필터링
     includeFiles?: boolean; // 파일 목록 포함 여부
+    branch?: string; // 특정 브랜치만 필터링
+    maxCommits?: number; // 최대 커밋 수 제한
 }
 
 export async function getGitCommits(repoPath: string, days: number = 7, options?: GitCommitOptions): Promise<GitCommit[]> {
     try {
         const since = `${options?.days || days}.days.ago`;
         let gitCommand = `git log "--pretty=format:%H|%s|%an|%ad" --date=short --numstat --since=${since}`;
+        
+        // 브랜치 필터 추가
+        if (options?.branch) {
+            gitCommand += ` ${options.branch}`;
+        }
+        
+        // 최대 커밋 수 제한
+        if (options?.maxCommits) {
+            gitCommand += ` -n ${options.maxCommits}`;
+        }
         
         // 경로 필터 추가
         if (options?.pathFilter) {
@@ -44,86 +56,116 @@ export async function getGitCommits(repoPath: string, days: number = 7, options?
             gitCommand += ` --author="${options.author}"`;
         }
         
-        // numstat을 사용하여 한 번에 모든 정보 가져오기 (훨씬 빠름!)
+        // numstat을 사용하여 한 번에 모든 정보 가져오기
         const { stdout } = await execAsync(
             gitCommand,
-            { cwd: repoPath, shell: 'powershell.exe', timeout: 10000 }
+            { cwd: repoPath, maxBuffer: 1024 * 1024 * 10, timeout: 15000 }
         );
 
         if (!stdout.trim()) {
             return [];
         }
 
-        const commits: GitCommit[] = [];
-        const lines = stdout.trim().split('\n');
-        
-        let currentCommit: Partial<GitCommit> | null = null;
+        return parseGitLog(stdout, options?.includeFiles);
+    } catch (error: any) {
+        if (error.killed || error.signal === 'SIGTERM') {
+            throw new Error('Git 명령 실행 시간이 초과되었습니다. 커밋이 너무 많거나 저장소가 큽니다.');
+        }
+        if (error.code === 'ENOENT') {
+            throw new Error('Git이 설치되어 있지 않거나 경로를 찾을 수 없습니다.');
+        }
+        if (error.stderr?.includes('not a git repository')) {
+            throw new Error('유효한 Git 저장소가 아닙니다.');
+        }
+        if (error.stderr?.includes('does not have any commits')) {
+            return [];
+        }
+        throw new Error(`Git 커밋을 가져오는데 실패했습니다: ${error.message || error}`);
+    }
+}
 
-        for (const line of lines) {
-            if (!line.trim()) continue;
+/**
+ * Git log 출력을 파싱하여 커밋 배열로 변환
+ */
+function parseGitLog(stdout: string, includeFiles?: boolean): GitCommit[] {
+    const commits: GitCommit[] = [];
+    const lines = stdout.trim().split('\n');
+    
+    let currentCommit: GitCommit | null = null;
 
-            // 커밋 헤더 라인 (|를 포함)
-            if (line.includes('|')) {
-                // 이전 커밋이 있으면 저장
-                if (currentCommit && currentCommit.hash) {
-                    commits.push({
-                        hash: currentCommit.hash,
-                        message: currentCommit.message || '',
-                        author: currentCommit.author || '',
-                        date: currentCommit.date || '',
-                        additions: currentCommit.additions || 0,
-                        deletions: currentCommit.deletions || 0
-                    });
-                }
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
 
-                // 새 커밋 시작
-                const [hash, message, author, date] = line.split('|');
-                currentCommit = {
-                    hash: hash.trim(),
-                    message: message.trim(),
-                    author: author.trim(),
-                    date: date.trim(),
-                    additions: 0,
-                    deletions: 0,
-                    files: options?.includeFiles ? [] : undefined
-                };
-            } else if (currentCommit) {
-                // numstat 라인 (additions deletions filename)
-                const parts = line.trim().split(/\s+/);
-                if (parts.length >= 2) {
-                    const add = parseInt(parts[0]) || 0;
-                    const del = parseInt(parts[1]) || 0;
-                    currentCommit.additions = (currentCommit.additions || 0) + add;
-                    currentCommit.deletions = (currentCommit.deletions || 0) + del;
+        // 커밋 헤더 라인 (|를 포함)
+        if (trimmedLine.includes('|')) {
+            // 이전 커밋이 있으면 저장
+            if (currentCommit) {
+                commits.push(currentCommit);
+            }
+
+            // 새 커밋 시작
+            const [hash, message, author, date] = trimmedLine.split('|');
+            currentCommit = {
+                hash: hash.trim(),
+                message: message.trim(),
+                author: author.trim(),
+                date: date.trim(),
+                additions: 0,
+                deletions: 0,
+                files: includeFiles ? [] : undefined
+            };
+        } else if (currentCommit) {
+            // numstat 라인 (additions deletions filename)
+            const parts = trimmedLine.split(/\s+/);
+            if (parts.length >= 3) {
+                const add = parseInt(parts[0]);
+                const del = parseInt(parts[1]);
+                
+                if (!isNaN(add) && !isNaN(del)) {
+                    currentCommit.additions += add;
+                    currentCommit.deletions += del;
                     
                     // 파일 이름 저장
-                    if (options?.includeFiles && parts.length >= 3) {
+                    if (includeFiles) {
                         const fileName = parts.slice(2).join(' ');
                         currentCommit.files?.push(fileName);
                     }
                 }
             }
         }
-
-        // 마지막 커밋 저장
-        if (currentCommit && currentCommit.hash) {
-            commits.push({
-                hash: currentCommit.hash,
-                message: currentCommit.message || '',
-                author: currentCommit.author || '',
-                date: currentCommit.date || '',
-                additions: currentCommit.additions || 0,
-                deletions: currentCommit.deletions || 0
-            });
-        }
-
-        return commits;
-    } catch (error: any) {
-        if (error.killed) {
-            throw new Error('Git 명령 실행 시간이 초과되었습니다. 커밋이 너무 많거나 저장소가 큽니다.');
-        }
-        throw new Error(`Git 커밋을 가져오는데 실패했습니다: ${error.message || error}`);
     }
+
+    // 마지막 커밋 저장
+    if (currentCommit) {
+        commits.push(currentCommit);
+    }
+
+    return commits;
+}
+
+/**
+ * 커밋 메시지가 유효한지 검증
+ */
+export function validateCommitMessage(message: string): { valid: boolean; issues: string[] } {
+    const issues: string[] = [];
+    
+    if (!message || message.trim().length === 0) {
+        issues.push('커밋 메시지가 비어있습니다.');
+    }
+    
+    if (message.length > 100) {
+        issues.push('커밋 메시지가 너무 깁니다 (100자 초과).');
+    }
+    
+    if (message.startsWith('WIP') || message.startsWith('wip')) {
+        issues.push('WIP(작업 중) 커밋입니다.');
+    }
+    
+    return {
+        valid: issues.length === 0,
+        issues
+    };
 }
 
 export function analyzeCommitStats(commits: GitCommit[]): CommitStats {
