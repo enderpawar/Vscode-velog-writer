@@ -20,6 +20,10 @@ export interface CommitStats {
     authors: Map<string, number>;
     fileTypes: Map<string, number>;
     commitsByDay: Map<string, number>;
+    commitCategories?: Map<string, number>; // feat, fix, docs 등
+    largeCommits?: GitCommit[]; // 큰 변경사항이 있는 커밋
+    avgCommitSize?: number; // 평균 커밋 크기
+    hourlyActivity?: Map<number, number>; // 시간대별 활동
 }
 
 export interface GitCommitOptions {
@@ -168,6 +172,60 @@ export function validateCommitMessage(message: string): { valid: boolean; issues
     };
 }
 
+/**
+ * 커밋 메시지에서 카테고리 추출 (Conventional Commits)
+ */
+export function extractCommitCategory(message: string): string {
+    const conventionalPattern = /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/i;
+    const match = message.match(conventionalPattern);
+    
+    if (match) {
+        return match[1].toLowerCase();
+    }
+    
+    // 한글 패턴도 감지
+    if (message.includes('기능') || message.includes('추가')) return 'feat';
+    if (message.includes('수정') || message.includes('버그')) return 'fix';
+    if (message.includes('문서')) return 'docs';
+    if (message.includes('리팩토링') || message.includes('개선')) return 'refactor';
+    if (message.includes('테스트')) return 'test';
+    if (message.includes('스타일')) return 'style';
+    
+    return 'other';
+}
+
+/**
+ * 시간대별 활동 패턴 분석을 위한 시간 추출
+ */
+export async function getCommitTimestamps(repoPath: string, days: number = 7): Promise<Date[]> {
+    try {
+        const since = `${days}.days.ago`;
+        const gitCommand = `git log --pretty=format:%ai --since=${since}`;
+        
+        const { stdout } = await execAsync(
+            gitCommand,
+            { cwd: repoPath, maxBuffer: 1024 * 1024 }
+        );
+
+        if (!stdout.trim()) {
+            return [];
+        }
+
+        return stdout.trim().split('\n').map(dateStr => new Date(dateStr));
+    } catch (error) {
+        return [];
+    }
+}
+
+/**
+ * 코드 리뷰가 필요한 큰 커밋 찾기
+ */
+export function findLargeCommits(commits: GitCommit[], threshold: number = 200): GitCommit[] {
+    return commits
+        .filter(commit => (commit.additions + commit.deletions) > threshold)
+        .sort((a, b) => (b.additions + b.deletions) - (a.additions + a.deletions));
+}
+
 export function analyzeCommitStats(commits: GitCommit[]): CommitStats {
     const stats: CommitStats = {
         totalCommits: commits.length,
@@ -175,19 +233,29 @@ export function analyzeCommitStats(commits: GitCommit[]): CommitStats {
         totalDeletions: 0,
         authors: new Map(),
         fileTypes: new Map(),
-        commitsByDay: new Map()
+        commitsByDay: new Map(),
+        commitCategories: new Map(),
+        largeCommits: [],
+        avgCommitSize: 0
     };
+
+    let totalChanges = 0;
 
     commits.forEach(commit => {
         // 총 변경사항
         stats.totalAdditions += commit.additions;
         stats.totalDeletions += commit.deletions;
+        totalChanges += commit.additions + commit.deletions;
 
         // 작성자별 커밋 수
         stats.authors.set(commit.author, (stats.authors.get(commit.author) || 0) + 1);
 
         // 날짜별 커밋 수
         stats.commitsByDay.set(commit.date, (stats.commitsByDay.get(commit.date) || 0) + 1);
+
+        // 커밋 카테고리 분석
+        const category = extractCommitCategory(commit.message);
+        stats.commitCategories!.set(category, (stats.commitCategories!.get(category) || 0) + 1);
 
         // 파일 타입별 통계
         if (commit.files) {
@@ -197,6 +265,12 @@ export function analyzeCommitStats(commits: GitCommit[]): CommitStats {
             });
         }
     });
+
+    // 평균 커밋 크기 계산
+    stats.avgCommitSize = commits.length > 0 ? Math.round(totalChanges / commits.length) : 0;
+
+    // 큰 커밋 찾기
+    stats.largeCommits = findLargeCommits(commits, 200);
 
     return stats;
 }
@@ -240,6 +314,46 @@ export function formatCommitStats(stats: CommitStats): string {
             const bar = '█'.repeat(Math.min(count, 20));
             output += `- ${date}: ${bar} (${count})\n`;
         });
+    }
+    
+    // 커밋 카테고리
+    if (stats.commitCategories && stats.commitCategories.size > 0) {
+        output += '\n### 🏷️ 커밋 카테고리\n';
+        const sortedCategories = Array.from(stats.commitCategories.entries())
+            .sort((a, b) => b[1] - a[1]);
+        const categoryEmojis: { [key: string]: string } = {
+            'feat': '✨',
+            'fix': '🐛',
+            'docs': '📝',
+            'style': '💄',
+            'refactor': '♻️',
+            'test': '✅',
+            'chore': '🔧',
+            'perf': '⚡',
+            'other': '📦'
+        };
+        sortedCategories.forEach(([category, count]) => {
+            const emoji = categoryEmojis[category] || '📦';
+            const percentage = ((count / stats.totalCommits) * 100).toFixed(1);
+            output += `- ${emoji} **${category}**: ${count}개 (${percentage}%)\n`;
+        });
+        output += '\n';
+    }
+    
+    // 평균 커밋 크기
+    if (stats.avgCommitSize) {
+        output += `### 📏 평균 커밋 크기\n`;
+        output += `**${stats.avgCommitSize}**줄 변경/커밋\n\n`;
+    }
+    
+    // 큰 커밋 경고
+    if (stats.largeCommits && stats.largeCommits.length > 0) {
+        output += '### ⚠️ 리뷰 필요 (큰 커밋)\n';
+        stats.largeCommits.slice(0, 5).forEach(commit => {
+            const changes = commit.additions + commit.deletions;
+            output += `- \`${commit.hash.substring(0, 7)}\` ${commit.message.substring(0, 50)} (+${commit.additions}/-${commit.deletions} = ${changes}줄)\n`;
+        });
+        output += '\n';
     }
     
     return output;
