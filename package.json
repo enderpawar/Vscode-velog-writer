@@ -1,7 +1,7 @@
 {
   "name": "velog-auto-writer",
   "displayName": "Velog Auto Writer",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Git 커밋으로부터 Velog 블로그 글을 자동 생성하는 VSCode Extension",
   "publisher": "snowmile",
   "repository": {
@@ -29,6 +29,10 @@
       {
         "command": "velog-auto-writer.setApiKey",
         "title": "Velog: Gemini API 키 설정"
+      },
+      {
+        "command": "velog-auto-writer.viewStats",
+        "title": "Velog: 커밋 통계 보기"
       }
     ],
     "viewsContainers": {
