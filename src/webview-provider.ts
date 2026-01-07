@@ -48,13 +48,19 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                     await this._analyzeExamplePosts(data.urls);
                     break;
                     
+                case 'generate':
+                    await this._generateBlogPost(data);
+                    break;
+                    
                 case 'getSettings':
                     const apiKey = this._context.globalState.get<string>('geminiApiKey', '');
                     const customPrompt = this._context.globalState.get<string>('customPrompt', '');
+                    const exampleUrls = this._context.globalState.get<string>('exampleUrls', '');
                     webviewView.webview.postMessage({
                         type: 'settings',
                         apiKey: apiKey ? '••••••••' : '',
-                        customPrompt: customPrompt
+                        customPrompt: customPrompt,
+                        exampleUrls: exampleUrls
                     });
                     break;
             }
@@ -513,7 +519,29 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             document.getElementById('apiKey').placeholder = 'API 키가 설정되어 있습니다';
             showStatus('API 키가 저장되었습니다!', 'success');
             setTimeout(() => hideStatus(), 3000);
-        }saveExampleUrls() {
+        }
+        
+        function saveCustomPrompt() {
+            const prompt = document.getElementById('customPrompt').value.trim();
+            vscode.postMessage({
+                type: 'saveCustomPrompt',
+                value: prompt
+            });
+            showStatus('커스텀 프롬프트가 저장되었습니다!', 'success');
+            setTimeout(() => hideStatus(), 3000);
+        }
+        
+        function resetCustomPrompt() {
+            document.getElementById('customPrompt').value = '';
+            vscode.postMessage({
+                type: 'saveCustomPrompt',
+                value: ''
+            });
+            showStatus('기본 프롬프트로 리셋되었습니다!', 'success');
+            setTimeout(() => hideStatus(), 3000);
+        }
+        
+        function saveExampleUrls() {
             const urls = document.getElementById('exampleUrls').value.trim();
             vscode.postMessage({
                 type: 'saveExampleUrls',
@@ -532,18 +560,8 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
             }
             
             const urls = urlsText.split('\\n').map(u => u.trim()).filter(u => u.length > 0);
-         
-        
-        function showAnalysisStatus(message, type) {
-            const status = document.getElementById('analysisStatus');
-            status.textContent = message;
-            status.className = 'status show ' + type;
-        }
-        
-        function hideAnalysisStatus() {
-            const status = document.getElementById('analysisStatus');
-            status.className = 'status';
-        }   if (urls.length === 0) {
+            
+            if (urls.length === 0) {
                 showAnalysisStatus('올바른 URL을 입력해주세요', 'error');
                 setTimeout(() => hideAnalysisStatus(), 3000);
                 return;
@@ -565,28 +583,6 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
                 useCustomPrompt: useCustomPrompt,
                 useExampleStyle: useExampleStyle
             });
-            showStatus('커스텀 프롬프트가 저장되었습니다!', 'success');
-            setTimeout(() => hideStatus(), 3000);
-        }
-        
-        function resetCustomPrompt() {
-            document.getElementById('customPrompt').value = '';
-            vscode.postMessage({
-                type: 'saveCustomPrompt',
-                value: ''
-            });
-            showStatus('기본 프롬프트로 리셋되었습니다!', 'success');
-            setTimeout(() => hideStatus(), 3000);
-        }
-        
-        function generateBlog() {
-            const days = parseInt(document.getElementById('days').value);
-            const useCustomPrompt = document.getElementById('useCustomPrompt').checked;
-            vscode.postMessage({
-                type: 'generate',
-                days: days,
-                useCustomPrompt: useCustomPrompt
-            });
         }
         
         function showStatus(message, type) {
@@ -597,6 +593,17 @@ export class VelogWebviewProvider implements vscode.WebviewViewProvider {
         
         function hideStatus() {
             const status = document.getElementById('status');
+            status.className = 'status';
+        }
+        
+        function showAnalysisStatus(message, type) {
+            const status = document.getElementById('analysisStatus');
+            status.textContent = message;
+            status.className = 'status show ' + type;
+        }
+        
+        function hideAnalysisStatus() {
+            const status = document.getElementById('analysisStatus');
             status.className = 'status';
         }
     </script>
