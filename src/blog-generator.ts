@@ -4,9 +4,9 @@ import { GitCommit, analyzeCommitStats, formatCommitStats } from './git-parser';
 export type BlogTemplate = 'default' | 'tutorial' | 'devlog' | 'troubleshooting' | 'retrospective';
 
 export async function generateBlogPost(
-    commits: GitCommit[], 
-    apiKey: string, 
-    customPrompt?: string, 
+    commits: GitCommit[],
+    apiKey: string,
+    customPrompt?: string,
     stylePrompt?: string,
     template?: BlogTemplate,
     includeStats?: boolean
@@ -15,15 +15,15 @@ export async function generateBlogPost(
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
     // 템플릿 적용
-    let prompt = customPrompt 
-        ? buildCustomPrompt(commits, customPrompt) 
+    let prompt = customPrompt
+        ? buildCustomPrompt(commits, customPrompt)
         : buildPromptWithTemplate(commits, template || 'default');
-    
+
     // 예시 글 스타일이 있으면 추가
     if (stylePrompt) {
         prompt = prompt + '\n\n' + stylePrompt;
     }
-    
+
     // 통계 정보 추가
     if (includeStats) {
         const stats = analyzeCommitStats(commits);
@@ -52,12 +52,24 @@ function buildPrompt(commits: GitCommit[]): string {
     const categories = new Set<string>();
     commits.forEach(commit => {
         const msg = commit.message.toLowerCase();
-        if (msg.includes('feat')) categories.add('기능 개발');
-        if (msg.includes('fix')) categories.add('버그 수정');
-        if (msg.includes('docs')) categories.add('문서화');
-        if (msg.includes('refactor')) categories.add('리팩토링');
-        if (msg.includes('test')) categories.add('테스트');
-        if (msg.includes('style')) categories.add('스타일');
+        if (msg.includes('feat')) {
+            categories.add('기능 개발');
+        }
+        if (msg.includes('fix')) {
+            categories.add('버그 수정');
+        }
+        if (msg.includes('docs')) {
+            categories.add('문서화');
+        }
+        if (msg.includes('refactor')) {
+            categories.add('리팩토링');
+        }
+        if (msg.includes('test')) {
+            categories.add('테스트');
+        }
+        if (msg.includes('style')) {
+            categories.add('스타일');
+        }
     });
 
     return `당신은 기술 블로그 작성 전문가입니다. 아래 Git 커밋 내역을 분석해서 **Velog 스타일의 기술 블로그 글**을 작성해주세요.
@@ -157,7 +169,7 @@ ${commitList}`;
 
 function buildPromptWithTemplate(commits: GitCommit[], template: BlogTemplate): string {
     const baseInfo = getBaseCommitInfo(commits);
-    
+
     switch (template) {
         case 'tutorial':
             return buildTutorialPrompt(commits, baseInfo);
@@ -178,16 +190,24 @@ function getBaseCommitInfo(commits: GitCommit[]) {
     const commitList = commits
         .map((c, i) => `${i + 1}. [${c.hash.slice(0, 7)}] ${c.message} (+${c.additions} -${c.deletions})`)
         .join('\n');
-    
+
     const categories = new Set<string>();
     commits.forEach(commit => {
         const msg = commit.message.toLowerCase();
-        if (msg.includes('feat')) categories.add('기능 개발');
-        if (msg.includes('fix')) categories.add('버그 수정');
-        if (msg.includes('docs')) categories.add('문서화');
-        if (msg.includes('refactor')) categories.add('리팩토링');
+        if (msg.includes('feat')) {
+            categories.add('기능 개발');
+        }
+        if (msg.includes('fix')) {
+            categories.add('버그 수정');
+        }
+        if (msg.includes('docs')) {
+            categories.add('문서화');
+        }
+        if (msg.includes('refactor')) {
+            categories.add('리팩토링');
+        }
     });
-    
+
     return { totalAdditions, totalDeletions, commitList, categories, commits };
 }
 
@@ -272,4 +292,3 @@ ${info.commitList}
 6. **## 다음에 시도할 것 (Try)**: 앞으로 적용할 방법
 7. 솔직하고 개인적인 감정 표현 포함`;
 }
-

@@ -1,5 +1,10 @@
 # ✍️ Velog Auto Writer
 
+[![CI/CD](https://github.com/enderpawar/Vscode-velog-writer/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/enderpawar/Vscode-velog-writer/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![VSCode](https://img.shields.io/badge/VSCode-1.107+-brightgreen.svg)](https://code.visualstudio.com/)
+
 Git 커밋으로부터 Velog 블로그 글을 자동으로 생성하는 VSCode Extension입니다.
 
 ## ✨ 특징
